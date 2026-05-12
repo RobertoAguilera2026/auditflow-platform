@@ -3777,9 +3777,6 @@ function openAddOpportunityModal(planProcessId) {
     <div class="form-group">
       <label class="required">Nivel de Riesgo</label>
       <div class="risk-selector">
-        <div class="risk-option adecuado" onclick="selectRiskLevel(this, 'Adequate')">
-          🟢 Adecuado
-        </div>
         <div class="risk-option aceptable selected" onclick="selectRiskLevel(this, 'Acceptable')">
           🟡 Aceptable
         </div>
@@ -3789,10 +3786,15 @@ function openAddOpportunityModal(planProcessId) {
         <div class="risk-option no-aceptable" onclick="selectRiskLevel(this, 'Not Acceptable')">
           🔴 No Aceptable
         </div>
+        <div class="risk-option adecuado" onclick="selectRiskLevel(this, 'Adequate')">
+          🟢 Adecuado
+        </div>
       </div>
-      <input type="hidden" id="opp-nivel-riesgo" value="Aceptable">
+      <input type="hidden" id="opp-nivel-riesgo" value="Acceptable">
     </div>
   `, async function() {
+    const nivel_riesgo = document.getElementById('opp-nivel-riesgo').value;
+    
     const data = {
       plan_process_id: planProcessId,
       oportunidad_identificada: document.getElementById('opp-identificada').value.trim(),
@@ -3803,7 +3805,7 @@ function openAddOpportunityModal(planProcessId) {
       compromisos_administracion: document.getElementById('opp-compromisos').value.trim(),
       responsable_nombre: document.getElementById('opp-resp-nombre').value.trim(),
       responsable_correo: document.getElementById('opp-resp-correo').value.trim(),
-      nivel_riesgo: document.getElementById('opp-nivel-riesgo').value,
+      nivel_riesgo: nivel_riesgo,
       estado: 'In Progress'
     };
     
@@ -3812,272 +3814,34 @@ function openAddOpportunityModal(planProcessId) {
       return;
     }
     
+    if (!data.nivel_riesgo) {
+      alert('Debe seleccionar un nivel de riesgo');
+      return;
+    }
+    
+    console.log('📤 Enviando datos:', data);
+    
     const { error } = await sb.from('audit_opportunities').insert(data);
     
     if (error) {
+      console.error('❌ Error al crear oportunidad:', error);
       alert('Error: ' + error.message);
       return;
     }
     
-    closeModal();
-    await loadOpportunities();
-    renderAnnualPlan(); // Esta función ya existe en tu código
-  });
-}
-
-// Seleccionar nivel de riesgo
-function selectRiskLevel(element, level) {
-  document.querySelectorAll('.risk-option').forEach(el => el.classList.remove('selected'));
-  element.classList.add('selected');
-  document.getElementById('opp-nivel-riesgo').value = level;
-}
-
-// Abrir modal para cambiar estado
-async function openChangeStatusModal(oppId) {
-  const { data: opp } = await sb
-    .from('audit_opportunities')
-    .select('*')
-    .eq('id', oppId)
-    .single();
-  
-  if (!opp) return;
-  
-  showModal('Change Status', `
-    <div class="form-group">
-      <label>Current Status: <strong>${opp.estado}</strong></label>
-      <select id="new-status">
-        <option value="En proceso de mejora" ${opp.estado === 'In Progress' ? 'selected' : ''}>
-          En proceso de mejora
-        </option>
-        <option value="Corregido" ${opp.estado === 'Corrected' ? 'selected' : ''}>
-          Corregido
-        </option>
-        <option value="Riesgo asumido" ${opp.estado === 'Risk Assumed' ? 'selected' : ''}>
-          Riesgo asumido por el dueño del proceso
-        </option>
-      </select>
-    </div>
-    <div style="font-size: 12px; color: var(--text3); margin-top: 8px; padding: 8px; background: var(--bg3); border-radius: var(--r);">
-      💡 Nota: "Riesgo asumido" se considera como completado en el Findings Pipeline
-    </div>
-  `, async function() {
-    const newStatus = document.getElementById('new-status').value;
-    
-    const { error } = await sb
-      .from('audit_opportunities')
-      .update({ estado: newStatus })
-      .eq('id', oppId);
-    
-    if (error) {
-      alert('Error: ' + error.message);
-      return;
-    }
+    console.log('✅ Oportunidad creada exitosamente');
     
     closeModal();
     await loadOpportunities();
-    renderAnnualPlan();
-  });
-}
-
-// Ver detalles de oportunidad
-async function openViewOpportunityModal(oppId) {
-  const { data: opp } = await sb
-    .from('audit_opportunities')
-    .select('*')
-    .eq('id', oppId)
-    .single();
-  
-  if (!opp) return;
-  
-  const riskClass = opp.nivel_riesgo ? opp.nivel_riesgo.toLowerCase().replace(/ /g, '-') : 'aceptable';
-  
-  showModal('Opportunity Details', `
-    <div style="margin-bottom: 12px;">
-      <span class="risk-badge risk-${riskClass}">${opp.nivel_riesgo || 'Acceptable'}</span>
-      <span class="status-badge status-${opp.estado.toLowerCase().replace(/ /g, '-')}">${opp.estado}</span>
-    </div>
     
-    <div style="margin-bottom: 12px;">
-      <strong style="font-size: 11px; color: var(--text3); text-transform: uppercase;">Oportunidad Identificada:</strong>
-      <div style="margin-top: 4px;">${opp.oportunidad_identificada}</div>
-    </div>
-    
-    ${opp.periodo_revision ? `
-      <div style="margin-bottom: 12px;">
-        <strong style="font-size: 11px; color: var(--text3); text-transform: uppercase;">Período:</strong>
-        <div style="margin-top: 4px;">${opp.periodo_revision}</div>
-      </div>
-    ` : ''}
-    
-    ${opp.riesgos_asociados ? `
-      <div style="margin-bottom: 12px;">
-        <strong style="font-size: 11px; color: var(--text3); text-transform: uppercase;">Riesgos Asociados:</strong>
-        <div style="margin-top: 4px;">${opp.riesgos_asociados}</div>
-      </div>
-    ` : ''}
-    
-    ${opp.desarrollo_hallazgo ? `
-      <div style="margin-bottom: 12px;">
-        <strong style="font-size: 11px; color: var(--text3); text-transform: uppercase;">Desarrollo del Hallazgo:</strong>
-        <div style="margin-top: 4px;">${opp.desarrollo_hallazgo}</div>
-      </div>
-    ` : ''}
-    
-    ${opp.descripcion_oportunidad ? `
-      <div style="margin-bottom: 12px;">
-        <strong style="font-size: 11px; color: var(--text3); text-transform: uppercase;">Descripción:</strong>
-        <div style="margin-top: 4px;">${opp.descripcion_oportunidad}</div>
-      </div>
-    ` : ''}
-    
-    ${opp.compromisos_administracion ? `
-      <div style="margin-bottom: 12px;">
-        <strong style="font-size: 11px; color: var(--text3); text-transform: uppercase;">Compromisos de la Administración:</strong>
-        <div style="margin-top: 4px;">${opp.compromisos_administracion}</div>
-      </div>
-    ` : ''}
-    
-    ${opp.responsable_nombre || opp.responsable_correo ? `
-      <div style="margin-bottom: 12px;">
-        <strong style="font-size: 11px; color: var(--text3); text-transform: uppercase;">Responsable:</strong>
-        <div style="margin-top: 4px;">
-          ${opp.responsable_nombre || '—'} 
-          ${opp.responsable_correo ? `<br><a href="mailto:${opp.responsable_correo}" style="color: var(--ab-purple)">${opp.responsable_correo}</a>` : ''}
-        </div>
-      </div>
-    ` : ''}
-    
-    ${opp.evidencia_correccion ? `
-      <div class="evidence-section">
-        <div class="evidence-header">📎 Evidence of Correction</div>
-        <div class="evidence-text">${opp.evidencia_correccion}</div>
-      </div>
-    ` : ''}
-  `, null);
-}
-
-// Editar oportunidad
-async function openEditOpportunityModal(oppId) {
-  const { data: opp } = await sb
-    .from('audit_opportunities')
-    .select('*')
-    .eq('id', oppId)
-    .single();
-  
-  if (!opp) return;
-  
-  showModal('Edit Opportunity', `
-    <div class="form-group">
-      <label class="required">Oportunidad Identificada en la Revisión</label>
-      <textarea id="opp-identificada">${opp.oportunidad_identificada || ''}</textarea>
-    </div>
-    
-    <div class="form-row">
-      <div class="form-group">
-        <label>Período de Revisión</label>
-        <input type="text" id="opp-periodo" value="${opp.periodo_revision || ''}">
-      </div>
-      <div class="form-group">
-        <label>Responsable - Nombre</label>
-        <input type="text" id="opp-resp-nombre" value="${opp.responsable_nombre || ''}">
-      </div>
-    </div>
-    
-    <div class="form-row">
-      <div class="form-group">
-        <label>Responsable - Correo</label>
-        <input type="email" id="opp-resp-correo" value="${opp.responsable_correo || ''}">
-      </div>
-    </div>
-    
-    <div class="form-group">
-      <label>Riesgos Asociados</label>
-      <textarea id="opp-riesgos">${opp.riesgos_asociados || ''}</textarea>
-    </div>
-    
-    <div class="form-group">
-      <label>Desarrollo del Hallazgo</label>
-      <textarea id="opp-desarrollo">${opp.desarrollo_hallazgo || ''}</textarea>
-    </div>
-    
-    <div class="form-group">
-      <label>Descripción de la Oportunidad</label>
-      <textarea id="opp-descripcion">${opp.descripcion_oportunidad || ''}</textarea>
-    </div>
-    
-    <div class="form-group">
-      <label>Compromisos de la Administración</label>
-      <textarea id="opp-compromisos">${opp.compromisos_administracion || ''}</textarea>
-    </div>
-    
-    <div class="form-group">
-      <label class="required">Nivel de Riesgo</label>
-      <div class="risk-selector">
-        <div class="risk-option adecuado ${opp.nivel_riesgo === 'Adequate' ? 'selected' : ''}" onclick="selectRiskLevel(this, 'Adequate')">
-          🟢 Adecuado
-        </div>
-        <div class="risk-option aceptable ${opp.nivel_riesgo === 'Acceptable' ? 'selected' : ''}" onclick="selectRiskLevel(this, 'Acceptable')">
-          🟡 Aceptable
-        </div>
-        <div class="risk-option tolerable ${opp.nivel_riesgo === 'Tolerable' ? 'selected' : ''}" onclick="selectRiskLevel(this, 'Tolerable')">
-          🟠 Tolerable
-        </div>
-        <div class="risk-option no-aceptable ${opp.nivel_riesgo === 'Not Acceptable' ? 'selected' : ''}" onclick="selectRiskLevel(this, 'Not Acceptable')">
-          🔴 No Aceptable
-        </div>
-      </div>
-      <input type="hidden" id="opp-nivel-riesgo" value="${opp.nivel_riesgo || 'Acceptable'}">
-    </div>
-  `, async function() {
-    const data = {
-      oportunidad_identificada: document.getElementById('opp-identificada').value.trim(),
-      periodo_revision: document.getElementById('opp-periodo').value.trim(),
-      riesgos_asociados: document.getElementById('opp-riesgos').value.trim(),
-      desarrollo_hallazgo: document.getElementById('opp-desarrollo').value.trim(),
-      descripcion_oportunidad: document.getElementById('opp-descripcion').value.trim(),
-      compromisos_administracion: document.getElementById('opp-compromisos').value.trim(),
-      responsable_nombre: document.getElementById('opp-resp-nombre').value.trim(),
-      responsable_correo: document.getElementById('opp-resp-correo').value.trim(),
-      nivel_riesgo: document.getElementById('opp-nivel-riesgo').value
-    };
-    
-    if (!data.oportunidad_identificada) {
-      alert('La oportunidad identificada es requerida');
-      return;
+    if (currentPage === 'plan-process') {
+      renderPlanProcess();
+    } else if (currentPage === 'dashboard') {
+      renderDashboard();
+    } else if (currentPage === 'plan-company') {
+      renderPlanCompany();
     }
-    
-    const { error } = await sb
-      .from('audit_opportunities')
-      .update(data)
-      .eq('id', oppId);
-    
-    if (error) {
-      alert('Error: ' + error.message);
-      return;
-    }
-    
-    closeModal();
-    await loadOpportunities();
-    renderAnnualPlan();
   });
-}
-
-// Eliminar oportunidad
-async function deleteOpportunity(oppId) {
-  if (!confirm('¿Está seguro de eliminar esta oportunidad?')) return;
-  
-  const { error } = await sb
-    .from('audit_opportunities')
-    .delete()
-    .eq('id', oppId);
-  
-  if (error) {
-    alert('Error: ' + error.message);
-    return;
-  }
-  
-  await loadOpportunities();
-  renderAnnualPlan();
 }
 
 // ═══════════════════════════════════════════════════════════
